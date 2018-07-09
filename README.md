@@ -1,13 +1,18 @@
 # -RubyDEV-ImprovementsModel
 
+The following improvements are just a general solution, I have several examples for each of the different models. The model repeats the problem presented, I will not repeat again. *Looking forward to receiving your comments. Thanks!*
+
 Models:
 1. [User](https://github.com/ducnhat1989/-RubyDEV-ImprovementsModel#improve-user-model)
 Low: 2 - 
 Medium: 2 - 
 Critical: 2
-2. [UserCourse](https://github.com/ducnhat1989/-RubyDEV-ImprovementsModel#improve-user-course-model)
+2. [UserCourse](https://github.com/ducnhat1989/-RubyDEV-ImprovementsModel#improve-usercourse-model)
 Low: 1 - 
-Critical: 1 -
+Critical: 1
+3. [RegistrationItem](https://github.com/ducnhat1989/-RubyDEV-ImprovementsModel#improve-registrationitem-model)
+Low: 1 - 
+Medium: 2 
 
 ### Improve User Model
 
@@ -301,3 +306,69 @@ As such, I understand that the code writer loads all the data because he does no
 One way to improve this is to calculate the value of `course_progress` and then save it in a `course_progress` column in the UserCourse. And when you need it, just query in the `sourse_progress`.
 
 Similarly, we can apply to improve the scope `with_progress_status`
+
+### Improve RegistrationItem Model
+
+#### Low
+
+1. Use the advantage of the ORM whenever possible
+
+Old code
+
+```RegistrationItem.rb
+def self.pending_for_user(user)
+  # TODO registration_items for active courses should be loaded
+  where(user_id: user.id, registered_at: nil)
+end
+```
+
+New code
+```RegistrationItem.rb
+def self.pending_for_user(user)
+  # TODO registration_items for active courses should be loaded
+  user.where(registered_at: nil)
+end
+```
+
+#### Medium
+
+1. Use `pluck` instead of `map`
+
+```
+def progress_status
+  # FIXME Maybe summarize progress_status of multiple user_courses ?
+  user_courses.map(&:progress_status).uniq.join(', ')
+end
+```
+
+The code above is using `map` to create an array of `progress_status`. It is quite a waste of resources because app rails will query all fields of `user_courses` to a collection, then scan this collection again to create a new array `progress_status`. So we will take up memory for 2 arrays.
+
+The good thing is to use `pluck` because with `pluck`, app rails will return an array contain just the value of `progress_status`.
+
+The optimization code will be
+
+```
+def progress_status
+  # FIXME Maybe summarize progress_status of multiple user_courses ?
+  user_courses.pluck(:progress_status).uniq.join(', ')
+end
+```
+
+2. Use `uniq!` instead of `uniq`
+
+Also with the above code, we can see that it is using `uniq`. Why use `uniq!` better?
+Because [uniq](https://apidock.com/ruby/Array/uniq) returns a new array by removing duplicate values in self. And [uniq!](https://apidock.com/ruby/Array/uniq%21) removes duplicate elements from self.
+
+So clearly using `uniq!` will save memory than `uniq`
+
+
+The optimization code will be
+
+```
+def progress_status
+  # FIXME Maybe summarize progress_status of multiple user_courses ?
+  user_courses.pluck(:progress_status).uniq!.join(', ')
+end
+```
+
+Similar methods `uniq` are `collect!`, `flatten!`, `select!`, `sort_by!`, ...
