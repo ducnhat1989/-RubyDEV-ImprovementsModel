@@ -1,5 +1,14 @@
 # -RubyDEV-ImprovementsModel
 
+Models:
+1. [User](https://github.com/ducnhat1989/-RubyDEV-ImprovementsModel#improve-user-model)
+Low: 2 - 
+Medium: 2 - 
+Critical: 2
+2. [UserCourse](https://github.com/ducnhat1989/-RubyDEV-ImprovementsModel#improve-user-course-model)
+Low: 1 - 
+Critical: 1 -
+
 ### Improve User Model
 
 #### Low
@@ -240,3 +249,55 @@ Why I correcting this, there are 2 reasons for this:
 
 - The old method, we must initialize array after use `sum` with the array, our app must initialize memory for the array, the larger the array, the larger the memory. While with the new method, we don't need to initialize array => processor speed will be improved, our app also less resource.
 - This is a problem with the SUM array in this case. That is, if the `nil` element is present in the array, the `sum` method will issue a `NoMethodError: undefined method `+' for nil:NilClass`. However, if you use `SUM` with SQL then SQL solves this problem for us.
+
+### Improve UserCourse Model
+
+#### Low
+
+1. Use `||=` operator instead of `if nil?`
+
+```UserCourse.rb
+def set_access_dates
+  if program.fixed_dates?
+    self.access_start_date = course.actual_access_start_date(false) if self.access_start_date.nil?
+    self.access_end_date = course.actual_access_end_date(false) if self.access_end_date.nil?
+  elsif program.rolling_start?
+    today = Time.current.in_time_zone(timezone).to_date
+    self.access_start_date = today if self.access_start_date.nil?
+    self.access_end_date = access_end_date_for_rolling_start if self.access_end_date.nil?
+  end
+end
+```
+
+This code is quite long, if you use `||=` operator, you can write code shorter.
+
+```UserCourse.rb
+def set_access_dates
+  if program.fixed_dates?
+    self.access_start_date ||= course.actual_access_start_date(false)
+    self.access_end_date ||= course.actual_access_end_date(false)
+  elsif program.rolling_start?
+    self.access_start_date ||= Time.current.in_time_zone(timezone).to_date
+    self.access_end_date ||= access_end_date_for_rolling_start
+  end
+end
+```
+
+#### Critical
+
+1. Issue of `with_course_progress` scope
+
+```UserCourse.rb
+scope :with_course_progress, -> (number, operator) {
+  selected_ids = all.select { |uc| uc.course_progress.send(convert_operator_for_ruby(operator), number.to_i) }.map(&:id)
+  where(id: selected_ids)
+}
+```
+
+Looking at this scope, I immediately noticed `all.select{}`. Why loading all data ? I understand when read the code a bit, for example: `with_course_progress("gt", 40)` will return UserCourses with `course_progress` > 40.
+
+As such, I understand that the code writer loads all the data because he does not know the value of `course_progress`. This approach is very bad, because if the amout of data of the UserCourse, then how this scope will handle? And I'm sure that it can not be processed quickly, here he moves all data into an array for processing, if the data is large, the array will grow, and this is not good with memory.
+
+One way to improve this is to calculate the value of `course_progress` and then save it in a `course_progress` column in the UserCourse. And when you need it, just query in the `sourse_progress`.
+
+Similarly, we can apply to improve the scope `with_progress_status`
